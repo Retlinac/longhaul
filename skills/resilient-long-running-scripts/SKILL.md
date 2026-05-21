@@ -1,6 +1,6 @@
 ---
 name: resilient-long-running-scripts
-version: 1.0.0
+version: 1.1.0
 description: Use when writing any script or process that runs unattended, takes more than a few minutes, iterates over units of work, or could fail silently — ML sweeps, test suites, builds, deployments, data pipelines.
 ---
 
@@ -308,6 +308,105 @@ function Run-Items($items) {
     if ($failed.Count -gt 0) { Write-Log "Failed: $($failed -join ', ')"; exit 1 }
 }
 ```
+
+## Parallelism
+
+Running units sequentially wastes available hardware. Before setting a fixed concurrency, detect what the machine has.
+
+```python
+import os, subprocess
+
+def detect_concurrency(task_type: str = "cpu") -> int:
+    """Return a sensible concurrency limit based on available hardware."""
+    cpu_count = os.cpu_count() or 4
+
+    if task_type == "gpu":
+        try:
+            r = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=10,
+            )
+            gpu_count = len([l for l in r.stdout.strip().splitlines() if l.strip()])
+            if gpu_count > 0:
+                return gpu_count  # one worker per GPU
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        return 1
+
+    if task_type == "browser":   # JS/IO-bound — can exceed CPU count
+        return min(cpu_count, 8)
+    if task_type == "cpu":       # CPU-bound — avoid thrashing
+        return max(1, cpu_count // 2)
+    # io / network-bound
+    return cpu_count * 2
+```
+
+**Choosing task_type:**
+
+| Workload | type | Rationale |
+|----------|------|-----------|
+| Browser automation, Playwright | `"browser"` | IO-bound, JS engine does the work |
+| Model inference (GPU) | `"gpu"` | One process per GPU |
+| Data crunching, compression | `"cpu"` | CPU-bound, cap at half cores |
+| API calls, DB queries | `"io"` | High latency tolerance |
+
+### Python async pattern (IO/browser)
+
+Use `asyncio.Semaphore` — safe because asyncio is single-threaded (no file I/O races):
+
+```python
+async def run(items, unit_timeout=60, max_retries=2):
+    concurrency = detect_concurrency("browser")
+    semaphore   = asyncio.Semaphore(concurrency)
+    done        = load_done()
+    completed   = [len(done)]  # list so nested async fn can mutate it
+
+    async def run_one(item):
+        key = str(item)
+        async with semaphore:
+            result = await asyncio.wait_for(run_unit(item), timeout=unit_timeout)
+        completed[0] += 1
+        log(f"[{completed[0]}/{len(items)}] {key} done")
+        append_result({"key": key, "result": result})
+        done.add(key)
+
+    pending = [item for item in items if str(item) not in done]
+    log(f"Starting {len(pending)} items | concurrency={concurrency}")
+    await asyncio.gather(*[run_one(item) for item in pending])
+    save_done(done)
+```
+
+### Python thread pattern (CPU/mixed)
+
+Use `ThreadPoolExecutor` when units are CPU-bound or call blocking libraries:
+
+```python
+from concurrent.futures import ThreadPoolExecutor, as_completed
+
+def run(items, unit_timeout=60, max_retries=2):
+    concurrency = detect_concurrency("cpu")
+    done = load_done()
+    log(f"Starting {len(items)} items | concurrency={concurrency}")
+
+    with ThreadPoolExecutor(max_workers=concurrency) as ex:
+        futures = {
+            ex.submit(run_unit, item): item
+            for item in items if str(item) not in done
+        }
+        for future in as_completed(futures):
+            item = futures[future]
+            key  = str(item)
+            try:
+                result = future.result(timeout=unit_timeout)
+                append_result({"key": key, "result": result})
+                done.add(key)
+                save_done(done)
+            except Exception as e:
+                log(f"FAILED: {key} — {e}")
+                append_result({"key": key, "error": str(e), "failed": True})
+```
+
+**Warning:** Module-level mutable state (e.g. `_RANKER_WEIGHT`) creates race conditions when parallelising across parameter values. Only parallelise within a single parameter value (all seeds at one weight), never across them simultaneously.
 
 ## Common Mistakes
 

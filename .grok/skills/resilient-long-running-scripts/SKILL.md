@@ -291,6 +291,45 @@ function Run-Items($items) {
 }
 ```
 
+## Parallelism
+
+Running units sequentially wastes available hardware. Before setting a fixed concurrency, detect what the machine has.
+
+```python
+import os, subprocess
+
+def detect_concurrency(task_type: str = "cpu") -> int:
+    cpu_count = os.cpu_count() or 4
+    if task_type == "gpu":
+        try:
+            r = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                capture_output=True, text=True, timeout=10,
+            )
+            gpu_count = len([l for l in r.stdout.strip().splitlines() if l.strip()])
+            if gpu_count > 0:
+                return gpu_count
+        except (FileNotFoundError, subprocess.TimeoutExpired):
+            pass
+        return 1
+    if task_type == "browser":
+        return min(cpu_count, 8)
+    if task_type == "cpu":
+        return max(1, cpu_count // 2)
+    return cpu_count * 2  # io/network
+```
+
+| Workload | type | Rationale |
+|----------|------|-----------|
+| Browser automation, Playwright | `"browser"` | IO-bound, JS engine does the work |
+| Model inference (GPU) | `"gpu"` | One process per GPU |
+| Data crunching, compression | `"cpu"` | CPU-bound, cap at half cores |
+| API calls, DB queries | `"io"` | High latency tolerance |
+
+**Async (IO/browser):** use `asyncio.Semaphore` + `asyncio.gather` within a single parameter value.
+**Threaded (CPU):** use `ThreadPoolExecutor` + `as_completed`.
+**Warning:** module-level mutable state creates race conditions across parameter values — only parallelise within one parameter at a time.
+
 ## Common Mistakes
 
 | Mistake | Fix |
