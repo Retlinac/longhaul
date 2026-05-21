@@ -7,7 +7,7 @@
   "plugins": [
     {
       "name": "longhaul",
-      "source": ".",
+      "source": "github:Retlinac/longhaul",
       "description": "Scripting standards for resilient long-running processes: checkpointing, self-healing, progress visibility, and cross-platform support."
     }
   ]
