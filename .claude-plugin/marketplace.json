@@ -1,0 +1,14 @@
+{
+  "name": "longhaul",
+  "owner": {
+    "name": "johninan",
+    "email": "johninan@gmail.com"
+  },
+  "plugins": [
+    {
+      "name": "longhaul",
+      "source": ".",
+      "description": "Scripting standards for resilient long-running processes: checkpointing, self-healing, progress visibility, and cross-platform support."
+    }
+  ]
+}
