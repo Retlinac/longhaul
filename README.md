@@ -62,9 +62,3 @@ Patterns for **Python**, **JavaScript/Node**, **Bash** (Linux + macOS), and **Po
 - JSON checkpoint file for resumability
 - Self-healing loop: on failure, invokes your AI CLI to diagnose and apply a fix, then retries (max 2 attempts, mark-and-continue on exhaustion)
 - Non-zero exit if any units permanently fail
-
----
-
-## License
-
-MIT
