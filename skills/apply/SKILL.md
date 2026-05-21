@@ -1,13 +1,18 @@
 ---
-name: resilient-long-running-scripts
+name: apply
 version: 1.1.0
 description: Use when writing any script or process that runs unattended, takes more than a few minutes, iterates over units of work, or could fail silently — ML sweeps, test suites, builds, deployments, data pipelines.
+arguments: "Optional language or task type to focus on (e.g. 'python', 'bash', 'js', 'powershell', 'ml sweep', 'deployment'). Omit for full overview."
 ---
 
 # Resilient Long-Running Scripts
 
+$ARGUMENTS
+
 ## Overview
 Every unattended script must be observable, resumable, and self-healing. Silent failure with no checkpoints means lost work and no diagnosis.
+
+> Apply these standards to the script above, or if no script was provided, show the full reference for the language/task specified.
 
 ## The 7 Hard Requirements
 
