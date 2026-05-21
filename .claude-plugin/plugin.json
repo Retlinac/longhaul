@@ -1,0 +1,8 @@
+{
+  "name": "longhaul",
+  "description": "Scripting standards for resilient long-running processes: checkpointing, self-healing, progress visibility, and cross-platform support.",
+  "author": {
+    "name": "johninan",
+    "email": "johninan@gmail.com"
+  }
+}
