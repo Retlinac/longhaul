@@ -52,6 +52,12 @@ cp -r .grok/skills/resilient-long-running-scripts ~/.grok/skills/
 
 ---
 
+## License
+
+MIT
+
+---
+
 ## What's Included
 
 Patterns for **Python**, **JavaScript/Node**, **Bash** (Linux + macOS), and **PowerShell** (Windows), each covering:
